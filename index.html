@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <!-- Tam ekran ve güvenli alan (çentik) desteği için viewport ayarları -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Still Listening</title>
+    
+    <!-- Tailwind CSS ve FontAwesome ikonları -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            /* One UI Renk Paleti - Zifiri Karanlık Mod */
+            --bg-pure: #000000;
+            --surface-dark: #121212;
+            --surface-search: #1c1c1e;
+            --text-main: #ffffff;
+            --text-muted: #888888;
+            --accent-blue: #4c9bed;
+            --accent-red: #ff3b30;
+            --divider: #222222;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-pure);
+            color: var(--text-main);
+            /* Metin seçimini ve dokunma vurgusunu kapat (Native hissi için) */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            overflow: hidden;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* One UI devasa başlık stili */
+        .one-ui-header {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            padding: 50px 24px 15px 24px;
+            background-color: var(--bg-pure);
+        }
+
+        .list-item {
+            transition: background-color 0.15s ease;
+        }
+        .list-item:active {
+            background-color: #1a1a1a;
+        }
+
+        /* Android FAB (Floating Action Button) */
+        .fab-button {
+            box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+            transition: transform 0.1s;
+        }
+        .fab-button:active {
+            transform: scale(0.92);
+        }
+
+        /* Alt Navigasyon Çubuğu */
+        .bottom-nav {
+            background-color: var(--bg-pure);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            border-top: 1px solid var(--divider);
+        }
+
+        .nav-item {
+            color: var(--text-muted);
+            transition: color 0.2s;
+        }
+        .nav-item.active {
+            color: var(--text-main);
+        }
+
+        /* Arama Ekranı (Aşağıdan yukarı kayarak açılır) */
+        .call-screen {
+            background: linear-gradient(180deg, #181818 0%, #000000 100%);
+            transform: translateY(100%);
+            transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .call-screen.active {
+            transform: translateY(0);
+        }
+
+        /* Dialog / Modal Pencereleri */
+        .dialog-overlay {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            background-color: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(2px);
+        }
+        .dialog-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .dialog-box {
+            transform: scale(0.9);
+            transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .dialog-overlay.active .dialog-box {
+            transform: scale(1);
+        }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .pulse {
+            animation: pulse-anim 2s infinite;
+        }
+        @keyframes pulse-anim {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen w-screen relative">
+
+    <!-- Gerçek Ses Dosyaları (Web Audio API yerine doğrudan MP3/OGG bağlantıları) -->
+    <audio id="audio-ringtone" src="https://actions.google.com/sounds/v1/alarms/phone_ringing.ogg" preload="auto"></audio>
+    <audio id="audio-pickup" src="https://actions.google.com/sounds/v1/switches/switch_click.ogg" preload="auto"></audio>
+
+    <!-- ANA REHBER EKRANI -->
+    <div id="screen-contacts" class="flex flex-col w-full h-full absolute inset-0 z-10 bg-black">
+        
+        <div class="one-ui-header flex justify-between items-center z-20">
+            <span>Kişiler</span>
+            <button onclick="requestNotification()" class="text-sm font-normal text-gray-500 hover:text-white px-2">
+                <i class="fa-regular fa-bell"></i>
+            </button>
+        </div>
+
+        <!-- Android Arama Çubuğu (Görsel) -->
+        <div class="px-5 pb-3 z-20">
+            <div class="bg-[var(--surface-search)] rounded-full h-11 flex items-center px-4 text-gray-400">
+                <i class="fa-solid fa-magnifying-glass mr-3 text-sm"></i>
+                <span class="text-[16px] font-light">Kişi ara</span>
+            </div>
+        </div>
+
+        <!-- Kişi Listesi -->
+        <div id="contacts-list" class="flex-1 overflow-y-auto hide-scrollbar px-3 pt-2 pb-24 z-10">
+            <!-- JavaScript ile doldurulacak -->
+        </div>
+
+        <!-- Kişi Ekleme Butonu (FAB) -->
+        <button id="btn-add-contact" class="fab-button absolute bottom-20 right-5 w-[60px] h-[60px] bg-[var(--accent-blue)] rounded-2xl flex items-center justify-center z-30">
+            <i class="fa-solid fa-plus text-[#000] text-2xl"></i>
+        </button>
+
+        <!-- Alt Navigasyon Çubuğu (One UI Tarzı) -->
+        <div class="bottom-nav w-full h-16 flex items-center justify-around z-30 mt-auto">
+            <div class="nav-item flex flex-col items-center gap-1 w-20 py-1">
+                <i class="fa-solid fa-grip text-xl mb-0.5"></i>
+                <span class="text-[12px] font-medium">Klavye</span>
+            </div>
+            <div class="nav-item flex flex-col items-center gap-1 w-20 py-1">
+                <i class="fa-solid fa-clock text-xl mb-0.5"></i>
+                <span class="text-[12px] font-medium">Son aramalar</span>
+            </div>
+            <div class="nav-item active flex flex-col items-center gap-1 w-20 py-1">
+                <i class="fa-solid fa-user text-xl mb-0.5"></i>
+                <span class="text-[12px] font-medium">Kişiler</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ARAMA EKRANI -->
+    <div id="screen-call" class="call-screen absolute inset-0 z-50 flex flex-col items-center justify-between py-12">
+        
+        <div class="w-full flex justify-end px-6 text-gray-400">
+            <i class="fa-solid fa-ellipsis-vertical text-xl p-2"></i>
+        </div>
+
+        <div class="flex flex-col items-center flex-1 mt-6">
+            <div id="call-avatar-bg" class="w-40 h-40 rounded-full bg-[#1c1c1e] flex items-center justify-center mb-8 shadow-xl">
+                <span id="call-avatar-text" class="text-6xl font-light text-white"></span>
+            </div>
+            <h2 id="call-name" class="text-[34px] font-normal text-white mb-2 tracking-tight"></h2>
+            <p id="call-status" class="text-[17px] text-gray-400 font-light">Aranıyor...</p>
+        </div>
+
+        <!-- Arama İçi Butonlar (Görsel) -->
+        <div class="w-full max-w-[320px] grid grid-cols-3 gap-y-10 mb-10 px-4">
+            <div class="flex flex-col items-center opacity-40">
+                <div class="w-12 h-12 rounded-full flex items-center justify-center mb-1">
+                    <i class="fa-solid fa-microphone-slash text-2xl"></i>
+                </div>
+                <span class="text-[13px]">Sessiz</span>
+            </div>
+            <div class="flex flex-col items-center opacity-40">
+                <div class="w-12 h-12 rounded-full flex items-center justify-center mb-1">
+                    <i class="fa-solid fa-grip text-2xl"></i>
+                </div>
+                <span class="text-[13px]">Klavye</span>
+            </div>
+            <div class="flex flex-col items-center opacity-40">
+                <div class="w-12 h-12 rounded-full flex items-center justify-center mb-1">
+                    <i class="fa-solid fa-volume-high text-2xl"></i>
+                </div>
+                <span class="text-[13px]">Hoparlör</span>
+            </div>
+        </div>
+
+        <!-- Çağrı Sonlandırma Butonu -->
+        <button id="btn-end-call" class="w-[76px] h-[76px] rounded-full bg-[var(--accent-red)] active:bg-[#d32f2f] flex items-center justify-center transition-colors mb-6 shadow-[0_4px_20px_rgba(255,59,48,0.3)]">
+            <i class="fa-solid fa-phone-slash text-white text-3xl"></i>
+        </button>
+    </div>
+
+    <!-- KİŞİ EKLE MODALI -->
+    <div id="modal-add" class="dialog-overlay absolute inset-0 z-[100] flex items-end sm:items-center justify-center pb-8 sm:pb-0 px-4">
+        <div class="dialog-box w-full max-w-sm bg-[#252525] sm:rounded-[24px] rounded-3xl p-6">
+            <h3 class="text-xl text-white font-medium mb-5 px-1">Yeni Kişi</h3>
+            <input type="text" id="input-name" placeholder="İsim" class="w-full bg-[#1a1a1a] text-white border-b-2 border-[#333] px-2 py-3 outline-none focus:border-[var(--accent-blue)] transition-all text-[18px] mb-2 font-light" autocomplete="off">
+            <p id="error-add" class="text-[var(--accent-red)] text-sm h-5 hidden px-2">Lütfen bir isim girin.</p>
+            
+            <div class="flex justify-end gap-1 mt-6">
+                <button id="btn-cancel-add" class="px-5 py-2.5 text-[var(--accent-blue)] font-medium rounded-full active:bg-[#333] transition-colors">İptal</button>
+                <button id="btn-save-add" class="px-5 py-2.5 text-[var(--accent-blue)] font-medium rounded-full active:bg-[#333] transition-colors">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- KİŞİ SİL ONAY MODALI -->
+    <div id="modal-delete" class="dialog-overlay absolute inset-0 z-[100] flex items-end sm:items-center justify-center pb-8 sm:pb-0 px-4">
+        <div class="dialog-box w-full max-w-sm bg-[#252525] sm:rounded-[24px] rounded-3xl p-6 text-center">
+            <h3 class="text-xl text-white font-medium mb-3">Kişiyi Sil</h3>
+            <p class="text-gray-400 text-[16px] mb-8 font-light">Bu kişiyi rehberden silmek istediğinize emin misiniz?</p>
+            
+            <div class="flex flex-col gap-3">
+                <button id="btn-confirm-del" class="w-full py-3.5 bg-[var(--accent-red)] text-white font-medium rounded-xl active:bg-[#d32f2f] transition-colors text-[17px]">Sil</button>
+                <button id="btn-cancel-del" class="w-full py-3.5 bg-[#3a3a3a] text-white font-medium rounded-xl active:bg-[#444] transition-colors text-[17px]">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Uygulama Durumu (State) ---
+        let contacts = [];
+        let contactToDelete = null;
+        
+        let callState = { 
+            active: false, 
+            ringCount: 0, 
+            timer: 0, 
+            timerInterval: null, 
+            ringTimeout: null 
+        };
+
+        // --- DOM Elementleri ---
+        const els = {
+            list: document.getElementById('contacts-list'),
+            screenCall: document.getElementById('screen-call'),
+            btnAdd: document.getElementById('btn-add-contact'),
+            btnEnd: document.getElementById('btn-end-call'),
+            modalAdd: document.getElementById('modal-add'),
+            modalDel: document.getElementById('modal-delete'),
+            inpName: document.getElementById('input-name'),
+            audioRing: document.getElementById('audio-ringtone'),
+            audioPickup: document.getElementById('audio-pickup'),
+            callStatus: document.getElementById('call-status')
+        };
+
+        // Renk Üretici (Profil fotoğrafları için)
+        const getAvatarColor = (name) => {
+            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#009688', '#ff9800', '#795548'];
+            let hash = 0;
+            for(let i=0; i<name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            return colors[Math.abs(hash) % colors.length];
+        };
+
+        // --- Rehber İşlemleri ---
+        const loadContacts = () => {
+            const stored = localStorage.getItem('still_listening_contacts_v2');
+            if (stored) {
+                contacts = JSON.parse(stored);
+            } else {
+                contacts = [{ id: Date.now(), name: "Annem" }];
+                saveContacts();
+            }
+            renderContacts();
+        };
+
+        const saveContacts = () => {
+            localStorage.setItem('still_listening_contacts_v2', JSON.stringify(contacts));
+        };
+
+        const renderContacts = () => {
+            els.list.innerHTML = '';
+            
+            if(contacts.length === 0) {
+                els.list.innerHTML = `
+                    <div class="flex flex-col items-center justify-center mt-32 opacity-40">
+                        <i class="fa-solid fa-address-book text-5xl mb-4"></i>
+                        <p class="font-light">Rehberiniz boş</p>
+                    </div>`;
+                return;
+            }
+
+            contacts.forEach(c => {
+                const initial = c.name.charAt(0).toUpperCase();
+                const color = getAvatarColor(c.name);
+                
+                const item = document.createElement('div');
+                item.className = 'list-item flex items-center px-2 py-3 rounded-2xl cursor-pointer mb-1';
+                item.onclick = () => startCall(c);
+
+                item.innerHTML = `
+                    <div class="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl mr-4 font-normal shadow-sm" style="background-color: ${color}">
+                        ${initial}
+                    </div>
+                    <div class="flex-1 py-2 flex justify-between items-center border-b border-[var(--divider)]">
+                        <span class="text-[18px] text-white font-normal tracking-wide">${c.name}</span>
+                        <button class="delete-btn w-12 h-12 flex items-center justify-center rounded-full text-[#555] hover:text-[var(--accent-red)] active:bg-[#222] transition-colors" data-id="${c.id}">
+                            <i class="fa-solid fa-trash-can text-[16px]"></i>
+                        </button>
+                    </div>
+                `;
+                els.list.appendChild(item);
+            });
+
+            // Silme Butonu Olay Dinleyicileri
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    e.stopPropagation(); // Aramayı tetiklemesini engelle
+                    contactToDelete = parseInt(btn.getAttribute('data-id'));
+                    els.modalDel.classList.add('active');
+                };
+            });
+        };
+
+        // --- STREAMING_CHUNK: Modalların Yönetimi ---
+        // Kişi Ekle Modalı
+        els.btnAdd.onclick = () => {
+            els.inpName.value = '';
+            document.getElementById('error-add').classList.add('hidden');
+            els.modalAdd.classList.add('active');
+            setTimeout(() => els.inpName.focus(), 100);
+        };
+        
+        document.getElementById('btn-cancel-add').onclick = () => els.modalAdd.classList.remove('active');
+        
+        document.getElementById('btn-save-add').onclick = () => {
+            const val = els.inpName.value.trim();
+            if(!val) {
+                document.getElementById('error-add').classList.remove('hidden');
+                return;
+            }
+            contacts.push({ id: Date.now(), name: val });
+            saveContacts();
+            renderContacts();
+            els.modalAdd.classList.remove('active');
+        };
+
+        // Kişi Sil Modalı
+        document.getElementById('btn-cancel-del').onclick = () => {
+            contactToDelete = null;
+            els.modalDel.classList.remove('active');
+        };
+        document.getElementById('btn-confirm-del').onclick = () => {
+            if(contactToDelete) {
+                contacts = contacts.filter(c => c.id !== contactToDelete);
+                saveContacts();
+                renderContacts();
+            }
+            els.modalDel.classList.remove('active');
+        };
+
+        // --- STREAMING_CHUNK: Arama Akışı ve Ses Motoru (Gerçek MP3) ---
+        const resetAudio = () => {
+            els.audioRing.pause();
+            els.audioRing.currentTime = 0;
+            els.audioPickup.pause();
+            els.audioPickup.currentTime = 0;
+        };
+
+        const startCall = (contact) => {
+            resetAudio();
+            
+            // Arayüzü Hazırla
+            document.getElementById('call-name').innerText = contact.name;
+            document.getElementById('call-avatar-text').innerText = contact.name.charAt(0).toUpperCase();
+            document.getElementById('call-avatar-bg').style.backgroundColor = getAvatarColor(contact.name);
+            
+            els.callStatus.innerText = "Aranıyor...";
+            els.callStatus.classList.add('pulse');
+            els.screenCall.classList.add('active');
+            
+            // State'i Sıfırla
+            callState.active = true;
+            callState.ringCount = 0;
+            callState.timer = 0;
+            clearTimeout(callState.ringTimeout);
+            clearInterval(callState.timerInterval);
+            
+            // Arama Döngüsünü Başlat
+            playRingSequence();
+        };
+
+        const playRingSequence = () => {
+            if(!callState.active) return;
+            
+            // Hedef: 3 Kere Çalması
+            if(callState.ringCount >= 3) {
+                executePickupSequence();
+                return;
+            }
+            
+            // Gerçek telefon çalma sesini başlat
+            els.audioRing.play().catch(e => console.log("Ses oynatma engellendi (Kullanıcı etkileşimi gerekebilir).", e));
+            callState.ringCount++;
+            
+            // Çalma sesi bittiğinde biraz bekle (2sn) ve tekrar çal
+            els.audioRing.onended = () => {
+                if(!callState.active) return;
+                callState.ringTimeout = setTimeout(playRingSequence, 2000);
+            };
+        };
+
+        const executePickupSequence = () => {
+            if(!callState.active) return;
+            
+            // Çalma animasyonunu durdur
+            els.callStatus.classList.remove('pulse');
+            els.callStatus.innerText = "Bağlanıyor...";
+            
+            // Gerçek Mekanik Ahize Açılma Sesini Oynat!
+            els.audioPickup.play().catch(e => console.log("Ahize sesi engellendi.", e));
+            
+            // Ahize sesinden hemen sonra: MUTLAK SESSİZLİK ve Sayaç Başlangıcı
+            els.audioPickup.onended = () => {
+                if(!callState.active) return;
+                
+                els.callStatus.innerText = "00:00";
+                
+                // Sayaç
+                callState.timerInterval = setInterval(() => {
+                    callState.timer++;
+                    const m = String(Math.floor(callState.timer / 60)).padStart(2, '0');
+                    const s = String(callState.timer % 60).padStart(2, '0');
+                    els.callStatus.innerText = `${m}:${s}`;
+                }, 1000);
+            };
+        };
+
+        // Çağrıyı Kapat
+        els.btnEnd.onclick = () => {
+            callState.active = false;
+            clearTimeout(callState.ringTimeout);
+            clearInterval(callState.timerInterval);
+            resetAudio();
+            
+            // Sadece görsel geri bildirim, ses yok.
+            els.callStatus.innerText = "Çağrı sonlandırıldı";
+            els.callStatus.classList.remove('pulse');
+            
+            setTimeout(() => {
+                els.screenCall.classList.remove('active');
+            }, 1000);
+        };
+
+        // --- STREAMING_CHUNK: Arka Plan Bildirim Sistemi (Cevapsız Çağrı) ---
+        const requestNotification = () => {
+            if ("Notification" in window) {
+                if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+                    Notification.requestPermission();
+                } else if (Notification.permission === "granted") {
+                    // Kullanıcı test etmek isterse diye manuel bildirim fırlat
+                    if(contacts.length > 0) {
+                        const randomContact = contacts[Math.floor(Math.random() * contacts.length)];
+                        new Notification(`Cevapsız Çağrı: ${randomContact.name}`, { body: "Seni düşündü..." });
+                    }
+                }
+            }
+        };
+
+        const scheduleRandomMissedCall = () => {
+            if (contacts.length === 0 || Notification.permission !== "granted") {
+                // İzin yoksa veya rehber boşsa 1 saat sonra tekrar kontrol et
+                setTimeout(scheduleRandomMissedCall, 60 * 60 * 1000); 
+                return;
+            }
+            
+            // 4 saat ile 12 saat arası rastgele bir süre (Milisaniye cinsinden)
+            const minTime = 4 * 60 * 60 * 1000;
+            const maxTime = 12 * 60 * 60 * 1000;
+            const randomDelay = Math.floor(Math.random() * (maxTime - minTime + 1)) + minTime;
+
+            setTimeout(() => {
+                const randomContact = contacts[Math.floor(Math.random() * contacts.length)];
+                new Notification(`Cevapsız Çağrı: ${randomContact.name}`, {
+                    body: "Seni düşündü...",
+                    icon: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>"
+                });
+                // Bildirim gönderdikten sonra bir sonrakini kur
+                scheduleRandomMissedCall(); 
+            }, randomDelay);
+        };
+
+        // Uygulamayı Başlat
+        window.onload = () => {
+            loadContacts();
+            scheduleRandomMissedCall();
+            
+            // iOS ve Bazı tarayıcılarda sesin oynatılabilmesi için ilk dokunuşta ses motorunu "uyandırmak" gerekir
+            document.body.addEventListener('touchstart', function() {
+                els.audioRing.load();
+                els.audioPickup.load();
+            }, { once: true });
+        };
+    </script>
+</body>
+  </html>
